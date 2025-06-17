@@ -1,4 +1,3 @@
-export const hello = () => "Hello, world!";
 import TelegramBot from "node-telegram-bot-api";
 import express from "express";
 import path from "path";
@@ -45,6 +44,49 @@ class JediTelegramBot {
 
     this.app.get("/", (req, res) => {
       res.sendFile(path.join(__dirname, "webapp", "index.html"));
+    });
+
+    // After successful payment verification
+    this.app.post("/api/verify-payment", async (req, res) => {
+      const { userId, txHash, botToken, botName } = req.body;
+
+      // Verify payment (existing code)
+      const session = this.userSessions.get(userId) || {
+        lastActivity: new Date(),
+      };
+      session.paymentVerified = true;
+      session.lastActivity = new Date();
+      this.userSessions.set(userId, session);
+
+      // Send bot config to manager
+      try {
+        const botConfig = {
+          userId: userId.toString(),
+          botToken,
+          botName,
+          walletAddress: session.walletAddress,
+          selectedSide: session.selectedSide,
+          openservConfig: {}, // Will be filled by manager
+        };
+
+        const response = await fetch("http://localhost:4000/api/create-bot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(botConfig),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          console.log(`✅ Created Jedi bot for user ${userId}: ${botName}`);
+        } else {
+          console.error(`❌ Failed to create bot: ${result.error}`);
+        }
+      } catch (error) {
+        console.error("Error creating bot:", error);
+      }
+
+      res.json({ success: true, verified: true });
     });
 
     // API endpoints for the mini app
