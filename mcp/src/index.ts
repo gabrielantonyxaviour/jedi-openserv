@@ -691,7 +691,7 @@ class JediContextServer {
 
     // Single MCP endpoint
     app.get("/mcp", async (req: AuthenticatedRequest, res) => {
-      console.log("Received MCP request:", req);
+      console.log("Received MCP request:");
 
       // Create SSE transport
       const transport = new SSEServerTransport("/mcp", res);
@@ -699,6 +699,9 @@ class JediContextServer {
       // Connect server to transport
       this.server.connect(transport);
 
+      console.log("Connected to transport");
+
+      res.status(200).send();
       // SSE transport will handle the JSON-RPC protocol automatically
     });
 
