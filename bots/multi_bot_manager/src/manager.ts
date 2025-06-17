@@ -3,27 +3,46 @@ import { JediBot } from "./bot.js";
 
 interface BotConfig {
   userId: string;
-  botToken: string;
-  botName: string;
+  commsBotToken: string;
+  socialsBotToken: string;
+  coreBotToken: string;
+  commsBotName: string;
+  socialsBotName: string;
+  coreBotName: string;
   walletAddress: string;
   selectedSide: "light" | "dark";
 }
 
 interface ActiveBot {
   config: BotConfig;
-  bot: TelegramBot;
-  jediBot: JediBot;
+  commsBot: TelegramBot;
+  jediCommsBot: JediBot;
+  socialsBot: TelegramBot;
+  jediSocialsBot: JediBot;
+  coreBot: TelegramBot;
+  jediCoreBot: JediBot;
 }
 
 export class BotManager {
   private activeBots: Map<string, ActiveBot> = new Map();
+  private nonce: number = 0;
 
   constructor() {
     console.log("🌟 Jedi Bot Manager initialized");
   }
 
   async createBot(config: BotConfig): Promise<void> {
-    const { userId, botToken, selectedSide } = config;
+    const {
+      userId,
+      commsBotName,
+      socialsBotName,
+      coreBotName,
+      commsBotToken,
+      socialsBotToken,
+      coreBotToken,
+      walletAddress,
+      selectedSide,
+    } = config;
 
     if (this.activeBots.has(userId)) {
       throw new Error(`Bot already exists for user ${userId}`);
@@ -35,22 +54,67 @@ export class BotManager {
 
     try {
       // Create Telegram bot instance
-      const bot = new TelegramBot(botToken, { polling: true });
+      const commsTelegramBot = new TelegramBot(commsBotToken, {
+        polling: true,
+      });
 
-      // Create Jedi bot with OpenServ integration
-      const jediBot = new JediBot(config, bot);
+      const socialsTelegramBot = new TelegramBot(socialsBotToken, {
+        polling: true,
+      });
+
+      const coreTelegramBot = new TelegramBot(coreBotToken, { polling: true });
+
+      const jediCommsBot = new JediBot(
+        {
+          nonce: this.nonce,
+          userId: userId,
+          botName: commsBotName,
+          kind: "comms",
+          walletAddress,
+          selectedSide,
+        },
+        commsTelegramBot
+      );
+      const jediSocialsBot = new JediBot(
+        {
+          nonce: this.nonce + 1,
+          userId: userId,
+          botName: socialsBotName,
+          kind: "socials",
+          walletAddress,
+          selectedSide,
+        },
+        socialsTelegramBot
+      );
+      const jediCoreBot = new JediBot(
+        {
+          nonce: this.nonce + 2,
+          userId: userId,
+          botName: coreBotName,
+          kind: "core",
+          walletAddress,
+          selectedSide,
+        },
+        coreTelegramBot
+      );
 
       // Store active bot
       const activeBot: ActiveBot = {
         config,
-        bot,
-        jediBot,
+        commsBot: commsTelegramBot,
+        jediCommsBot,
+        socialsBot: socialsTelegramBot,
+        jediSocialsBot: jediSocialsBot,
+        coreBot: coreTelegramBot,
+        jediCoreBot: jediCoreBot,
       };
 
       this.activeBots.set(userId, activeBot);
 
       // Start the bot
-      await jediBot.start();
+      await jediCommsBot.start();
+      await jediSocialsBot.start();
+      await jediCoreBot.start();
 
       console.log(
         `✅ Jedi bot created for user ${userId} with ${selectedSide} side`
@@ -71,7 +135,9 @@ export class BotManager {
     console.log(`🛑 Removing bot for user ${userId}`);
 
     // Stop Telegram polling
-    await activeBot.bot.stopPolling();
+    await activeBot.commsBot.stopPolling();
+    await activeBot.socialsBot.stopPolling();
+    await activeBot.coreBot.stopPolling();
 
     // Remove from active bots
     this.activeBots.delete(userId);
@@ -88,9 +154,11 @@ export class BotManager {
 
     return {
       status: "active",
-      botName: activeBot.config.botName,
+      commsBotName: activeBot.config.commsBotName,
+      socialsBotName: activeBot.config.socialsBotName,
+      coreBotName: activeBot.config.coreBotName,
       side: activeBot.config.selectedSide,
-      workspaceId: 4440,
+      workspaceId: process.env.WORKSPACE_ID,
       created: true,
     };
   }

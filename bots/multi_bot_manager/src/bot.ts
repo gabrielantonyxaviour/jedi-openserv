@@ -7,9 +7,10 @@ import dotenv from "dotenv";
 dotenv.config();
 
 interface BotConfig {
+  nonce: number;
   userId: string;
-  botToken: string;
   botName: string;
+  kind: "comms" | "socials" | "core";
   walletAddress: string;
   selectedSide: "light" | "dark";
 }
@@ -28,15 +29,19 @@ export class JediBot extends Agent {
   private userSessions: Map<number, unknown> = new Map();
   private workspaceId: number;
   private agentId: number;
-
+  private ownerUserId: string;
+  private nonce: number;
+  private kind: "comms" | "socials" | "core";
   constructor(config: BotConfig, bot: TelegramBot) {
     super({
-      systemPrompt: `You are a Jedi AI assistant representing the ${config.selectedSide} side of the Force.`,
+      systemPrompt: `Your name is ${config.botName}. You are the Jedi ${config.kind} AI assistant representing the ${config.selectedSide} side of the Force.`,
       apiKey: process.env.OPENSERV_API_KEY!,
-      port: 8000 + parseInt(config.userId), // Unique port per user
+      port: 8000 + config.nonce, // Unique port per user
     });
-
+    this.ownerUserId = config.userId;
+    this.nonce = config.nonce;
     this.config = config;
+    this.kind = config.kind;
     this.bot = bot;
     this.workspaceId = parseInt(process.env.WORKSPACE_ID || "4467");
     this.agentId = parseInt(process.env.JEDI_AGENT_ID || "1");
@@ -44,7 +49,7 @@ export class JediBot extends Agent {
 
   async start(): Promise<void> {
     console.log(
-      `🌟 Starting Jedi bot for ${this.config.botName} (${this.config.selectedSide} side)`
+      `🌟 Starting Jedi ${this.config.kind} bot for ${this.config.botName} (${this.config.selectedSide} side)`
     );
 
     // Start the OpenServ agent
