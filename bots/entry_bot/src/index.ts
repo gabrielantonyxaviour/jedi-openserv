@@ -1,235 +1,345 @@
 import TelegramBot from "node-telegram-bot-api";
-import express from "express";
-import path from "path";
-import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const WEBAPP_URL = process.env.WEBAPP_URL || "https://your-domain.com";
 
 if (!BOT_TOKEN) {
   console.error("TELEGRAM_BOT_TOKEN is required");
   process.exit(1);
 }
 
-interface UserSession {
-  walletAddress?: string;
-  selectedSide?: "light" | "dark";
-  selectedAgents?: string[];
-  paymentVerified?: boolean;
-  lastActivity: Date;
+interface UserState {
+  step:
+    | "idle"
+    | "choosing_side"
+    | "comms_name"
+    | "comms_token"
+    | "socials_name"
+    | "socials_token"
+    | "core_name"
+    | "core_token"
+    | "complete";
+  side?: "light" | "dark";
+  agents: {
+    comms?: { name: string; token: string };
+    socials?: { name: string; token: string };
+    core?: { name: string; token: string };
+  };
 }
 
-class JediTelegramBot {
+class JediBot {
   private bot: TelegramBot;
-  private app: express.Application;
-  private userSessions: Map<number, UserSession> = new Map();
+  private userStates: Map<number, UserState> = new Map();
 
   constructor() {
     this.bot = new TelegramBot(BOT_TOKEN!, { polling: true });
-    this.app = express();
-    this.setupWebApp();
     this.setupHandlers();
     console.log("🌟 Jedi Bot activated...");
-  }
-
-  private setupWebApp() {
-    this.app.use(express.static("./src/webapp"));
-    this.app.use(express.json());
-
-    this.app.get("/", (req, res) => {
-      res.sendFile(path.join(__dirname, "webapp", "index.html"));
-    });
-
-    // After successful payment verification
-    this.app.post("/api/verify-payment", async (req, res) => {
-      const { userId, txHash, botToken, botName } = req.body;
-
-      // Verify payment (existing code)
-      const session = this.userSessions.get(userId) || {
-        lastActivity: new Date(),
-      };
-      session.paymentVerified = true;
-      session.lastActivity = new Date();
-      this.userSessions.set(userId, session);
-
-      // Send bot config to manager
-      try {
-        const botConfig = {
-          userId: userId.toString(),
-          botToken,
-          botName,
-          walletAddress: session.walletAddress,
-          selectedSide: session.selectedSide,
-          openservConfig: {}, // Will be filled by manager
-        };
-
-        const response = await fetch("http://localhost:4000/api/create-bot", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(botConfig),
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-          console.log(`✅ Created Jedi bot for user ${userId}: ${botName}`);
-        } else {
-          console.error(`❌ Failed to create bot: ${result.error}`);
-        }
-      } catch (error) {
-        console.error("Error creating bot:", error);
-      }
-
-      res.json({ success: true, verified: true });
-    });
-
-    // API endpoints for the mini app
-    this.app.post("/api/select-side", (req, res) => {
-      const { userId, side } = req.body;
-      const session = this.userSessions.get(userId) || {
-        lastActivity: new Date(),
-      };
-      session.selectedSide = side;
-      session.lastActivity = new Date();
-      this.userSessions.set(userId, session);
-      res.json({ success: true });
-    });
-
-    this.app.post("/api/connect-wallet", (req, res) => {
-      const { userId, walletAddress } = req.body;
-      const session = this.userSessions.get(userId) || {
-        lastActivity: new Date(),
-      };
-      session.walletAddress = walletAddress;
-      session.lastActivity = new Date();
-      this.userSessions.set(userId, session);
-      res.json({ success: true });
-    });
-
-    this.app.post("/api/verify-payment", (req, res) => {
-      const { userId, txHash } = req.body;
-      // In production, verify the transaction on Base Sepolia
-      const session = this.userSessions.get(userId) || {
-        lastActivity: new Date(),
-      };
-      session.paymentVerified = true;
-      session.lastActivity = new Date();
-      this.userSessions.set(userId, session);
-      res.json({ success: true, verified: true });
-    });
-
-    const PORT = process.env.PORT || 3000;
-    this.app.listen(PORT, () => {
-      console.log(`🚀 Web app running on port ${PORT}`);
-    });
   }
 
   private setupHandlers() {
     this.bot.onText(/\/start/, (msg) => {
       const chatId = msg.chat.id;
-      const userId = msg.from?.id;
+      const userId = msg.from?.id!;
 
-      if (userId) {
-        this.userSessions.set(userId, { lastActivity: new Date() });
-      }
+      this.userStates.set(userId, { step: "choosing_side", agents: {} });
 
-      const webAppButton = {
-        text: "🌟 Enter the Jedi Universe",
-        web_app: { url: `${WEBAPP_URL}?user_id=${userId}` },
+      const welcomeMessage = `⭐️ *WELCOME TO JEDI* ⭐️
+
+      Create the only AI co-founder you ever need.
+
+╭─────────────────────╮
+│  🌌 Choose Your Path 🌌  │
+╰─────────────────────╯
+
+The Force flows through two paths.
+
+Choose wisely, young Padawan.`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            {
+              text: "🔵 Light Side - Path of the Jedi",
+              callback_data: "side_light",
+            },
+          ],
+          [
+            {
+              text: "🔴 Dark Side - Path of the Sith",
+              callback_data: "side_dark",
+            },
+          ],
+        ],
       };
-
-      const welcomeMessage = `⭐ *Welcome, Young Padawan* ⭐
-
-The Force has guided you to *Jedi AI* - your personal AI agent system inspired by the greatest saga in the galaxy.
-
-🌌 Choose your path:
-- 🔵 **Light Side** - Noble Jedi Masters guide your journey
-- 🔴 **Dark Side** - Powerful Sith Lords command your empire
-
-Your destiny awaits with 4 specialized AI agents ready to serve you across:
-- 💬 **Communications** 
-- 👥 **Community Management**
-- 💼 **Business & Compliance**
-- ⚡ **Core Operations**
-
-*The Force will be with you... always.*`;
 
       this.bot.sendMessage(chatId, welcomeMessage, {
         parse_mode: "Markdown",
-        reply_markup: {
-          keyboard: [[webAppButton]],
-          resize_keyboard: true,
-        },
+        reply_markup: keyboard,
       });
+    });
+
+    this.bot.on("callback_query", (query) => {
+      const chatId = query.message?.chat.id!;
+      const userId = query.from.id;
+      const data = query.data!;
+
+      this.bot.answerCallbackQuery(query.id);
+      this.handleCallback(chatId, userId, data);
     });
 
     this.bot.on("message", (msg) => {
       const chatId = msg.chat.id;
-      const userId = msg.from?.id;
-      const text = msg.text;
+      const userId = msg.from?.id!;
+      const text = msg.text?.trim();
 
-      if (text?.startsWith("/")) return;
+      if (!text || text.startsWith("/")) return;
 
-      if (!userId || !text) return;
+      const state = this.userStates.get(userId);
+      if (!state) return;
 
-      const session = this.userSessions.get(userId);
-
-      if (session?.paymentVerified) {
-        this.handleJediMessage(chatId, userId, text, session);
-      } else {
-        this.bot.sendMessage(
-          chatId,
-          `🌟 Complete your Jedi training first!\n\nOpen the Jedi Universe to:\n• Choose your side\n• Meet your agents\n• Connect wallet & pay 0.0001 ETH\n\nThen I'll be ready to serve you!`
-        );
-      }
+      this.handleTextInput(chatId, userId, text, state);
     });
   }
 
-  private handleJediMessage(
+  private handleCallback(chatId: number, userId: number, data: string) {
+    const state = this.userStates.get(userId);
+    if (!state) return;
+
+    if (data.startsWith("side_")) {
+      const side = data.split("_")[1] as "light" | "dark";
+      state.side = side;
+      state.step = "comms_name";
+      this.userStates.set(userId, state);
+
+      this.showSideConfirmation(chatId, side);
+    }
+  }
+
+  private showSideConfirmation(chatId: number, side: "light" | "dark") {
+    const isLight = side === "light";
+    const sideEmoji = isLight ? "🔵" : "🔴";
+    const sideName = isLight ? "LIGHT SIDE" : "DARK SIDE";
+    const description = isLight
+      ? "✨ Wisdom • Compassion • Peace\n🧙‍♂️ Noble Jedi Masters guide your journey"
+      : "⚡ Power • Efficiency • Control\n👤 Dark Sith Lords command your empire";
+
+    const message = `${sideEmoji} *${sideName} CHOSEN!* ${sideEmoji}
+
+╭─────────────────────╮
+│     ${description}     │
+╰─────────────────────╯
+
+🤖 *AGENT SETUP -  1/3*
+
+💬 **Setup the Commander of Comms**
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+Name of the Commander of Comms:`;
+
+    this.bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
+  }
+
+  private handleTextInput(
     chatId: number,
     userId: number,
     text: string,
-    session: UserSession
+    state: UserState
   ) {
-    const side = session.selectedSide;
-    const sideEmoji = side === "light" ? "🔵" : "🔴";
-    const sideTitle = side === "light" ? "Jedi Council" : "Sith Order";
+    switch (state.step) {
+      case "comms_name":
+        state.agents.comms = { name: text, token: "" };
+        state.step = "comms_token";
+        this.userStates.set(userId, state);
 
-    const response = `${sideEmoji} *${sideTitle} Response*
+        const commsMessage = `✅ *Welcome, ${text}. Commander of Comms!*
 
-🤖 Your ${side} side agents are processing: "${text}"
+💬 **Your bot** is ready for configuration
 
-⚡ *Status*: All 4 agents activated
-🌌 *Side*: ${side === "light" ? "Light Side" : "Dark Side"}
-💰 *Wallet*: ${session.walletAddress?.slice(
-      0,
-      6
-    )}...${session.walletAddress?.slice(-4)}
+  🔑 Now enter the Telegram Bot Token for your bot:`;
 
-🛠️ *Development Mode*: Your agents will soon provide intelligent responses using the Force of AI!
+        this.bot.sendMessage(chatId, commsMessage, { parse_mode: "Markdown" });
+        break;
 
-May the Force be with you! ⭐`;
+      case "comms_token":
+        if (this.isValidBotToken(text)) {
+          state.agents.comms!.token = text;
+          state.step = "socials_name";
+          this.userStates.set(userId, state);
+          this.showSocialsSetup(chatId);
+        } else {
+          this.showTokenError(chatId);
+        }
+        break;
 
-    this.bot.sendMessage(chatId, response, {
-      parse_mode: "Markdown",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            {
-              text: "🌟 Open Jedi Universe",
-              web_app: { url: `${WEBAPP_URL}?user_id=${userId}` },
-            },
-          ],
+      case "socials_name":
+        state.agents.socials = { name: text, token: "" };
+        state.step = "socials_token";
+        this.userStates.set(userId, state);
+
+        const socialsMessage = `✅ *Welcome, ${text}. Commander of Socials!*
+
+💬 **Your bot** is ready for configuration
+
+  🔑 Now enter the Telegram Bot Token for your bot:`;
+
+        this.bot.sendMessage(chatId, socialsMessage, {
+          parse_mode: "Markdown",
+        });
+        break;
+
+      case "socials_token":
+        if (this.isValidBotToken(text)) {
+          state.agents.socials!.token = text;
+          state.step = "core_name";
+          this.userStates.set(userId, state);
+          this.showCoreSetup(chatId);
+        } else {
+          this.showTokenError(chatId);
+        }
+        break;
+
+      case "core_name":
+        state.agents.core = { name: text, token: "" };
+        state.step = "core_token";
+        this.userStates.set(userId, state);
+
+        const coreMessage = `✅ *Welcome, ${text}. Commander of Core!*
+
+💬 **Your bot** is ready for configuration
+
+  🔑 Now enter the Telegram Bot Token for your bot:`;
+
+        this.bot.sendMessage(chatId, coreMessage, { parse_mode: "Markdown" });
+        break;
+
+      case "core_token":
+        if (this.isValidBotToken(text)) {
+          state.agents.core!.token = text;
+          state.step = "complete";
+          this.userStates.set(userId, state);
+          this.showCompletion(chatId, state);
+        } else {
+          this.showTokenError(chatId);
+        }
+        break;
+    }
+  }
+
+  private showSocialsSetup(chatId: number) {
+    const message = `🎉 *Commander of Comms is ready!*
+
+🤖 *AGENT SETUP - STEP 2/3*
+
+� **Setup the Commander of Socials**
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+Name of the Commander of Socials:`;
+
+    this.bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
+  }
+
+  private showCoreSetup(chatId: number) {
+    const message = `🎉 *Commander of Socials is ready!*
+
+🤖 *AGENT SETUP -  3/3*
+
+� **Setup the Commander of Core Operations**
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+Name of the Commander of Core Operations:`;
+
+    this.bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
+  }
+
+  private showTokenError(chatId: number) {
+    const message = `❌ *Invalid Bot Token Format*
+
+🔍 **Expected Format:**
+\`123456789:ABCdefGHIjklMNOpqrsTUVwxyz\`
+
+💡 **How to get a bot token:**
+1. Message @BotFather on Telegram
+2. Use /newbot command
+3. Follow the instructions
+4. Copy the token it gives you
+
+Please try again:`;
+
+    this.bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
+  }
+
+  private isValidBotToken(token: string): boolean {
+    return /^\d+:[A-Za-z0-9_-]+$/.test(token);
+  }
+
+  private showCompletion(chatId: number, state: UserState) {
+    const sideEmoji = state.side === "light" ? "🔵" : "🔴";
+    const sideName = state.side === "light" ? "LIGHT SIDE" : "DARK SIDE";
+
+    const completionMessage = `🌟 *SETUP COMPLETE!* 🌟
+
+╭─────────────────────╮
+│  🎉 AGENTS ACTIVATED! 🎉  │
+╰─────────────────────╯
+
+${sideEmoji} **Path:** ${sideName}
+
+🤖 **YOUR COMMANDERS:**
+
+💬 **${state.agents.comms!.name}**
+   └ Commander of Comms Ready
+
+📱 **${state.agents.socials!.name}**
+   └ Commander of Socials Ready
+
+⚡ **${state.agents.core!.name}**
+   └ Commander of Core Operations Ready
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+✨ *All systems operational*
+🚀 *Ready to serve your empire*
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+*May the Force be with you... always.*`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          {
+            text: "🔄 Setup New Empire",
+            callback_data: "restart",
+          },
         ],
+      ],
+    };
+
+    this.bot.sendMessage(chatId, completionMessage, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+
+    // Log configuration
+    console.log(`✅ User ${chatId} completed setup:`, {
+      side: state.side,
+      agents: {
+        comms: {
+          name: state.agents.comms!.name,
+          token: state.agents.comms!.token.substring(0, 10) + "...",
+        },
+        socials: {
+          name: state.agents.socials!.name,
+          token: state.agents.socials!.token.substring(0, 10) + "...",
+        },
+        core: {
+          name: state.agents.core!.name,
+          token: state.agents.core!.token.substring(0, 10) + "...",
+        },
       },
     });
   }
 }
 
-const jediBot = new JediTelegramBot();
+new JediBot();
