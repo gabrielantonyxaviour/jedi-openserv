@@ -1,5 +1,6 @@
 import TelegramBot from "node-telegram-bot-api";
 import dotenv from "dotenv";
+import axios from "axios";
 
 dotenv.config();
 
@@ -220,7 +221,7 @@ Name of the Commander of Comms:`;
           state.agents.core!.token = text;
           state.step = "complete";
           this.userStates.set(userId, state);
-          this.showCompletion(chatId, state);
+          this.showCompletion(chatId, userId, state);
         } else {
           this.showTokenError(chatId);
         }
@@ -275,7 +276,11 @@ Please try again:`;
     return /^\d+:[A-Za-z0-9_-]+$/.test(token);
   }
 
-  private showCompletion(chatId: number, state: UserState) {
+  private async showCompletion(
+    chatId: number,
+    userId: number,
+    state: UserState
+  ) {
     const sideEmoji = state.side === "light" ? "🔵" : "🔴";
     const sideName = state.side === "light" ? "LIGHT SIDE" : "DARK SIDE";
 
@@ -315,6 +320,31 @@ ${sideEmoji} **Path:** ${sideName}
         ],
       ],
     };
+
+    console.log({
+      userId: userId,
+      commsBotToken: state.agents.comms!.token,
+      socialsBotToken: state.agents.socials!.token,
+      coreBotToken: state.agents.core!.token,
+      commsBotName: state.agents.comms!.name,
+      socialsBotName: state.agents.socials!.name,
+      coreBotName: state.agents.core!.name,
+      walletAddress: "0x0000000000000000000000000000000000000000",
+      selectedSide: state.side,
+    });
+    const response = await axios.post("http://localhost:4000/api/create-bot", {
+      userId: userId.toString(),
+      commsBotToken: state.agents.comms!.token,
+      socialsBotToken: state.agents.socials!.token,
+      coreBotToken: state.agents.core!.token,
+      commsBotName: state.agents.comms!.name,
+      socialsBotName: state.agents.socials!.name,
+      coreBotName: state.agents.core!.name,
+      walletAddress: "0x0000000000000000000000000000000000000000",
+      selectedSide: state.side,
+    });
+
+    console.log(response.data);
 
     this.bot.sendMessage(chatId, completionMessage, {
       parse_mode: "Markdown",

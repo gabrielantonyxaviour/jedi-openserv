@@ -9,24 +9,46 @@ app.use(express.json());
 
 const botManager = new BotManager();
 
-let userId = 0;
-
 // API endpoint to create a new bot (called by entry_bot)
 app.post("/api/create-bot", async (req, res) => {
   try {
-    const { botToken, botName, walletAddress, selectedSide } = req.body;
+    const {
+      userId,
+      commsBotToken,
+      socialsBotToken,
+      coreBotToken,
+      commsBotName,
+      socialsBotName,
+      coreBotName,
+      walletAddress,
+      selectedSide,
+    } = req.body;
+
+    // const body = {
+    //   userId: userId.toString(),
+    //   commsBotToken: state.agents.comms!.token,
+    //   socialsBotToken: state.agents.socials!.token,
+    //   coreBotToken: state.agents.core!.token,
+    //   commsBotName: state.agents.comms!.name,
+    //   socialsBotName: state.agents.socials!.name,
+    //   coreBotName: state.agents.core!.name,
+    //   walletAddress: "0x0000000000000000000000000000000000000000",
+    //   selectedSide: state.side,
+    // }
 
     await botManager.createBot({
       userId: userId.toString(),
-      botToken,
-      botName,
+      commsBotToken,
+      socialsBotToken,
+      coreBotToken,
+      commsBotName,
+      socialsBotName,
+      coreBotName,
       walletAddress,
       selectedSide,
     });
 
-    userId++;
-
-    res.json({ success: true, message: `Bot created for ${botName}` });
+    res.json({ success: true, message: `Bots created` });
   } catch (error) {
     console.error("Error creating bot:", error);
     res.status(500).json({
