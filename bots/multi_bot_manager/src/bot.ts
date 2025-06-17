@@ -1,7 +1,10 @@
 import TelegramBot from "node-telegram-bot-api";
 import { Agent } from "@openserv-labs/sdk";
-import { CHARACTERS } from "./character";
+import { CHARACTERS } from "./character.js";
 import axios from "axios";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 interface BotConfig {
   userId: string;
@@ -9,10 +12,6 @@ interface BotConfig {
   botName: string;
   walletAddress: string;
   selectedSide: "light" | "dark";
-  openservConfig: {
-    workspaceId: number;
-    agentId: number; // Single agent ID for the comms project
-  };
 }
 
 interface Character {
@@ -39,8 +38,8 @@ export class JediBot extends Agent {
 
     this.config = config;
     this.bot = bot;
-    this.workspaceId = config.openservConfig.workspaceId;
-    this.agentId = config.openservConfig.agentId;
+    this.workspaceId = parseInt(process.env.WORKSPACE_ID || "4467");
+    this.agentId = parseInt(process.env.JEDI_AGENT_ID || "1");
   }
 
   async start(): Promise<void> {
@@ -201,6 +200,7 @@ ${response}
     const character = CHARACTERS[side].comms;
 
     try {
+      console.log("this is being called");
       // Create task for the Jedi comms project
       const task = await this.createTask({
         workspaceId: this.workspaceId,

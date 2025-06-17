@@ -38,16 +38,7 @@ export class BotManager {
       const bot = new TelegramBot(botToken, { polling: true });
 
       // Create Jedi bot with OpenServ integration
-      const jediBot = new JediBot(
-        {
-          ...config,
-          openservConfig: {
-            workspaceId: parseInt(process.env.JEDI_WORKSPACE_ID!), // 4440
-            agentId: parseInt(process.env.JEDI_AGENT_ID!), // The comms project agent ID
-          },
-        },
-        bot
-      );
+      const jediBot = new JediBot(config, bot);
 
       // Store active bot
       const activeBot: ActiveBot = {

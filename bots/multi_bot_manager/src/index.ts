@@ -1,5 +1,5 @@
 import express from "express";
-import { BotManager } from "./manager";
+import { BotManager } from "./manager.js";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -9,25 +9,22 @@ app.use(express.json());
 
 const botManager = new BotManager();
 
+let userId = 0;
+
 // API endpoint to create a new bot (called by entry_bot)
 app.post("/api/create-bot", async (req, res) => {
   try {
-    const {
-      userId,
-      botToken,
-      botName,
-      walletAddress,
-      selectedSide,
-      openservConfig,
-    } = req.body;
+    const { botToken, botName, walletAddress, selectedSide } = req.body;
 
     await botManager.createBot({
-      userId,
+      userId: userId.toString(),
       botToken,
       botName,
       walletAddress,
       selectedSide,
     });
+
+    userId++;
 
     res.json({ success: true, message: `Bot created for ${botName}` });
   } catch (error) {
