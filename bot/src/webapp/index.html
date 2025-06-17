@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Jedi AI Universe</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.8.0/dist/web3.min.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <!-- Loading Screen -->
+      <div id="loading" class="screen active">
+        <div class="stars"></div>
+        <div class="loading-content">
+          <div class="jedi-logo">⭐ JEDI AI ⭐</div>
+          <div class="loading-text">Awakening the Force...</div>
+          <div class="loading-spinner"></div>
+        </div>
+      </div>
+
+      <!-- Side Selection Screen -->
+      <div id="side-selection" class="screen">
+        <div class="stars"></div>
+        <div class="side-selection-content">
+          <h1 class="main-title">Choose Your Path</h1>
+          <p class="subtitle">
+            The Force flows through two paths. Choose wisely, young Padawan.
+          </p>
+
+          <div class="sides-container">
+            <button class="side-card light-side" onclick="selectSide('light')">
+              <div class="side-icon">🔵</div>
+              <h2>Light Side</h2>
+              <p>Path of the Jedi</p>
+              <div class="side-description">
+                Wisdom • Compassion • Peace<br />
+                Noble masters guide your journey
+              </div>
+            </button>
+
+            <button class="side-card dark-side" onclick="selectSide('dark')">
+              <div class="side-icon">🔴</div>
+              <h2>Dark Side</h2>
+              <p>Path of the Sith</p>
+              <div class="side-description">
+                Power • Efficiency • Control<br />
+                Dark lords command your empire
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Character Introduction Screen -->
+      <div id="character-intro" class="screen">
+        <div class="stars"></div>
+        <div class="character-content">
+          <div class="side-header">
+            <div id="side-badge"></div>
+            <h1 id="side-title"></h1>
+          </div>
+
+          <div class="agents-grid" id="agents-grid">
+            <!-- Characters will be populated here -->
+          </div>
+
+          <div class="intro-controls">
+            <button id="prev-agent" class="nav-btn" onclick="previousAgent()">
+              ⬅️ Previous
+            </button>
+            <div class="agent-indicator" id="agent-indicator">
+              <span class="current">1</span> / <span class="total">4</span>
+            </div>
+            <button id="next-agent" class="nav-btn" onclick="nextAgent()">
+              Next ➡️
+            </button>
+          </div>
+
+          <button
+            id="meet-agents"
+            class="action-btn"
+            onclick="showWalletConnection()"
+            style="display: none"
+          >
+            Ready to Begin ⚡
+          </button>
+        </div>
+      </div>
+
+      <!-- Wallet Connection Screen -->
+      <div id="wallet-connection" class="screen">
+        <div class="stars"></div>
+        <div class="wallet-content">
+          <div class="wallet-header">
+            <h1>🔗 Connect Your Destiny</h1>
+            <p>Link your wallet to activate your Jedi AI agents</p>
+          </div>
+
+          <div class="wallet-info">
+            <div class="payment-details">
+              <h3>⚡ Activation Fee</h3>
+              <div class="fee-amount">0.0001 ETH</div>
+              <div class="network">Base Sepolia Testnet</div>
+              <p>
+                This fee activates your AI agents and unlocks the full Jedi
+                experience.
+              </p>
+            </div>
+          </div>
+
+          <div class="wallet-actions">
+            <button
+              id="connect-wallet"
+              class="action-btn"
+              onclick="connectWallet()"
+            >
+              🔗 Connect Wallet
+            </button>
+            <div id="wallet-status" class="wallet-status"></div>
+          </div>
+
+          <div
+            id="payment-section"
+            class="payment-section"
+            style="display: none"
+          >
+            <h3>💰 Complete Payment</h3>
+            <button
+              id="pay-fee"
+              class="action-btn"
+              onclick="payActivationFee()"
+            >
+              Pay 0.0001 ETH ⚡
+            </button>
+            <div id="payment-status" class="payment-status"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Welcome Screen -->
+      <div id="welcome" class="screen">
+        <div class="stars"></div>
+        <div class="welcome-content">
+          <div class="success-animation">
+            <div class="success-icon">✨</div>
+            <h1>Welcome to the Jedi Universe!</h1>
+          </div>
+
+          <div class="welcome-message">
+            <p>Your AI agents are now active and ready to serve you.</p>
+            <div id="user-summary" class="user-summary">
+              <!-- User details will be populated here -->
+            </div>
+          </div>
+
+          <div class="welcome-actions">
+            <button class="action-btn" onclick="openTelegram()">
+              🤖 Start Chatting with Jedi
+            </button>
+            <button class="secondary-btn" onclick="showAgentPanel()">
+              👥 View Your Agents
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="characters.js"></script>
+    <script type="module" src="script.js"></script>
+  </body>
+</html>
