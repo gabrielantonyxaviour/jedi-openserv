@@ -288,17 +288,20 @@ ${response}
         workspaceId: this.workspaceId,
         assignee: this.agentId,
         description: `Jedi ${side} side response to user message`,
-        body: `User (${this.config.botName}) said: "${message}"
+        body: `${
+          this.kind == "comms" ? "Someone asked:" : "The founder asked:"
+        } "${message}"
 
-Please respond as ${character.name} from the ${side} side of the Force.
-
-Character context:
-- Name: ${character.name}
-- Title: ${character.title}
-- Personality: ${character.personality}
-- Side: ${side} side of the Force
-
-Respond in character while being helpful and wise. Keep a Star Wars themed flair in your response but focus on actually helping the user.`,
+        ${
+          this.kind == "comms"
+            ? "You should reply to this question by either triggering the Research Assistant if the task involves external research. If its a basic question trigger the General assistant. If the user wants you to talk more about something, Research Assistant followed by Essay Assistant. If someone speaks in a foreign language use MultiLigual Agnet for translation. If someone asks you to generate an image use Dall E Agent."
+            : this.kind == "socials"
+            ? "You should reply to this question by either triggering the Research Assistant if the task involves external research. If its a basic tweet request, use General Assistant. If the founder, wants you to make a tweet in a different language, use MultiLigual Agnet then General Assistant to make the tweet. Only if the user specificallty asks for an image or video, you must generate the video or image using apporpirate agents and include them in the tweet. "
+            : "You should reply to the founder in the best of your knowledge."
+        }
+        
+        IMPORTANT INSTRUCTION: DO NOT USE agents that are not mentioned in the instructions. Be concious with the agents you use. Not all agents need to be user for all tasks.
+        `,
         input: message,
         expectedOutput: `A helpful response from ${character.name} that stays in character`,
         dependencies: [],
