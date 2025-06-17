@@ -64,6 +64,21 @@ export class JediBot extends Agent {
         ? process.env.SOCIALS_AGENT_ID!
         : process.env.CORE_AGENT_ID!
     );
+
+    if (this.config.kind == "socials") {
+      this.createTask({
+        workspaceId: this.workspaceId,
+        assignee: parseInt(process.env.GENERAL_AGENT_ID || "3"),
+        description: `Jedi socials side response to user message`,
+        body: `Generate a tweet to setup the project`,
+        input: `Here is the basic description of the project:
+         ${this.about}. 
+         
+         Create a first tweet announcing that you, Darth Vader are going to handle the twitter for this project and also explain in short about the poject all in less than 250 characters.`,
+        expectedOutput: `A tweet that announces that you, Darth Vader are going to handle the twitter for this project and also explain in short about the poject all in less than 250 characters.`,
+        dependencies: [],
+      });
+    }
   }
 
   async start(): Promise<void> {
