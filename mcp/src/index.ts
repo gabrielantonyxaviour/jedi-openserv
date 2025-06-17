@@ -248,7 +248,7 @@ class JediContextServer {
           throw new Error("Wallet address required for context access");
         }
 
-        const context = this.getWalletContext(walletAddress);
+        const context = this.getWalletContext(walletAddress as string);
 
         if (contextKey in context) {
           return {
