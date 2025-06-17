@@ -1,11 +1,15 @@
+import dotenv from "dotenv";
+dotenv.config();
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import {
   CallToolRequestSchema,
   ListResourcesRequestSchema,
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import express from "express";
+import cors from "cors";
 
 interface SharedContext {
   owner: string;
@@ -107,6 +111,10 @@ interface SharedContext {
 
 interface WalletContexts {
   [walletAddress: string]: SharedContext;
+}
+
+interface AuthenticatedRequest extends express.Request {
+  walletAddress?: string;
 }
 
 class JediContextServer {
@@ -659,9 +667,45 @@ class JediContextServer {
   }
 
   async run() {
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
-    console.log("Jedi Context Server running...");
+    const app = express();
+    const PORT = process.env.PORT || 3001;
+    const API_KEY = process.env.API_KEY || "abcd";
+
+    app.use(cors());
+    app.use(express.json());
+
+    const authenticateApiKey = (
+      req: AuthenticatedRequest,
+      res: express.Response,
+      next: express.NextFunction
+    ) => {
+      // const apiKey = req.headers["api-key"] || req.headers["API_KEY"];
+      // if (apiKey !== API_KEY) {
+      //   res.status(401).json({ error: "Invalid API key" });
+      //   return;
+      // }
+      next();
+    };
+
+    app.use("/mcp", authenticateApiKey);
+
+    // Single MCP endpoint
+    app.get("/mcp", async (req: AuthenticatedRequest, res) => {
+      console.log("Received MCP request:", req);
+
+      // Create SSE transport
+      const transport = new SSEServerTransport("/mcp", res);
+
+      // Connect server to transport
+      this.server.connect(transport);
+
+      // SSE transport will handle the JSON-RPC protocol automatically
+    });
+
+    app.listen(PORT, () => {
+      console.log(`Jedi Context Server running on http://localhost:${PORT}`);
+      console.log(`MCP endpoint: http://localhost:${PORT}/mcp`);
+    });
   }
 }
 
