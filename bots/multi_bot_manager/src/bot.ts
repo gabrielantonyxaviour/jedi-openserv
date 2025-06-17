@@ -1,7 +1,7 @@
 import TelegramBot from "node-telegram-bot-api";
 import { Agent } from "@openserv-labs/sdk";
-import { z } from "zod";
 import { CHARACTERS } from "./character";
+import axios from "axios";
 
 interface BotConfig {
   userId: string;
@@ -10,16 +10,9 @@ interface BotConfig {
   walletAddress: string;
   selectedSide: "light" | "dark";
   openservConfig: {
-    workspaceId: string;
-    agentIds: Record<string, string>;
+    workspaceId: number;
+    agentId: number; // Single agent ID for the comms project
   };
-}
-
-interface JediAgents {
-  comms: Agent;
-  community: Agent;
-  business: Agent;
-  core: Agent;
 }
 
 interface Character {
@@ -30,18 +23,24 @@ interface Character {
   personality: string;
 }
 
-export class JediBot {
+export class JediBot extends Agent {
   private config: BotConfig;
   private bot: TelegramBot;
-  private agents: JediAgents;
   private userSessions: Map<number, unknown> = new Map();
+  private workspaceId: number;
+  private agentId: number;
 
-  constructor(config: BotConfig, bot: TelegramBot, agents: JediAgents) {
+  constructor(config: BotConfig, bot: TelegramBot) {
+    super({
+      systemPrompt: `You are a Jedi AI assistant representing the ${config.selectedSide} side of the Force.`,
+      apiKey: process.env.OPENSERV_API_KEY!,
+      port: 8000 + parseInt(config.userId), // Unique port per user
+    });
+
     this.config = config;
     this.bot = bot;
-    this.agents = agents;
-
-    this.setupCapabilities();
+    this.workspaceId = config.openservConfig.workspaceId;
+    this.agentId = config.openservConfig.agentId;
   }
 
   async start(): Promise<void> {
@@ -49,87 +48,19 @@ export class JediBot {
       `🌟 Starting Jedi bot for ${this.config.botName} (${this.config.selectedSide} side)`
     );
 
+    // Start the OpenServ agent
+    super.start();
+
     this.setupHandlers();
 
     console.log(`✅ Jedi bot active for user ${this.config.userId}`);
-  }
-
-  private setupCapabilities(): void {
-    const side = this.config.selectedSide;
-    const sideCharacters = CHARACTERS[side];
-
-    // Add capabilities to each agent
-    Object.entries(this.agents).forEach(([agentType, agent]) => {
-      const character =
-        sideCharacters[agentType as keyof typeof sideCharacters];
-
-      agent.addCapabilities([
-        {
-          name: "respondAsCharacter",
-          description: `Respond as ${character.name} to user messages`,
-          schema: z.object({
-            userMessage: z.string().describe("The user message to respond to"),
-            context: z
-              .string()
-              .optional()
-              .describe("Additional context for the response"),
-          }),
-          async run({
-            args,
-          }: {
-            args: { userMessage: string; context?: string };
-          }) {
-            const { userMessage, context } = args;
-
-            const response = await this.generateCharacterResponse(
-              character,
-              userMessage,
-              context
-            );
-
-            return response;
-          },
-        },
-        {
-          name: "collaborateWithAgents",
-          description: "Collaborate with other Jedi agents in the workspace",
-          schema: z.object({
-            message: z.string().describe("Message to share with other agents"),
-            targetAgent: z
-              .string()
-              .optional()
-              .describe("Specific agent to collaborate with"),
-          }),
-          async run({
-            args,
-          }: {
-            args: { message: string; targetAgent?: string };
-          }) {
-            const { message, targetAgent } = args;
-
-            // Send collaboration message to workspace
-            await agent.sendChatMessage({
-              workspaceId: this.config.openservConfig.workspaceId,
-              agentId:
-                this.config.openservConfig.agentIds[
-                  agentType as keyof typeof this.config.openservConfig.agentIds
-                ],
-              message: `[${character.name}] ${message}`,
-            });
-
-            return `Collaboration message sent to ${
-              targetAgent || "all agents"
-            }`;
-          },
-        },
-      ]);
-    });
   }
 
   private setupHandlers(): void {
     const side = this.config.selectedSide;
     const sideEmoji = side === "light" ? "🔵" : "🔴";
     const sideTitle = side === "light" ? "Jedi Council" : "Sith Order";
+    const character = CHARACTERS[side].comms; // Use the comms character
 
     // Start command
     this.bot.onText(/\/start/, (msg) => {
@@ -141,18 +72,18 @@ export class JediBot {
 
 🌟 Your ${sideTitle} is ready to serve!
 
-Your AI agents are active:
-${Object.entries(CHARACTERS[side])
-  .map(([type, char]) => `• ${char.image} **${char.name}** - ${char.title}`)
-  .join("\n")}
+${character.image} **${character.name}** - ${character.title}
 
 💰 **Wallet**: ${this.config.walletAddress.slice(
         0,
         6
       )}...${this.config.walletAddress.slice(-4)}
 ⚡ **Status**: All systems operational
+🔮 **Workspace**: ${this.workspaceId}
 
-Simply message me and your agents will respond according to your needs!
+Simply message me and your Jedi AI will respond with the wisdom of the ${side} side!
+
+*${character.greeting}*
 
 *May the Force be with you!* ⭐`;
 
@@ -161,21 +92,56 @@ Simply message me and your agents will respond according to your needs!
       });
     });
 
-    // Agent selection commands
-    this.bot.onText(/\/(comms|community|business|core)/, async (msg, match) => {
+    // Ask command (like in the example)
+    this.bot.onText(/\/ask (.+)/, async (msg, match) => {
       const chatId = msg.chat.id;
-      const agentType = match![1] as keyof JediAgents;
-      const character = CHARACTERS[side][agentType];
+      const question = match?.[1];
 
-      const message = `${character.image} **${character.name}** speaking:
+      if (!question) {
+        await this.bot.sendMessage(
+          chatId,
+          "❌ Please write a question: /ask [your question]"
+        );
+        return;
+      }
 
-"${character.greeting}"
+      // Send typing indicator
+      this.bot.sendChatAction(chatId, "typing");
 
-I'm ready to help with ${agentType} matters. What do you need?`;
+      try {
+        console.log(
+          `📝 Question received from ${this.config.userId}: "${question}"`
+        );
 
-      this.bot.sendMessage(chatId, message, {
-        parse_mode: "Markdown",
-      });
+        const response = await this.handleUserMessage(question, chatId);
+
+        if (response) {
+          const formattedResponse = `${character.image} **${character.name}**:
+
+${response}
+
+---
+*${sideTitle} • ${side === "light" ? "Light Side" : "Dark Side"} Wisdom*`;
+
+          await this.bot.sendMessage(chatId, formattedResponse, {
+            parse_mode: "Markdown",
+          });
+        } else {
+          await this.bot.sendMessage(
+            chatId,
+            "❌ Sorry, I could not process your request. Please try again."
+          );
+        }
+      } catch (error) {
+        console.error(
+          `Error processing question for ${this.config.userId}:`,
+          error
+        );
+        await this.bot.sendMessage(
+          chatId,
+          "❌ An error occurred. Please try again."
+        );
+      }
     });
 
     // General message handler
@@ -186,31 +152,33 @@ I'm ready to help with ${agentType} matters. What do you need?`;
 
       if (!text || text.startsWith("/") || !userId) return;
 
-      try {
-        // Determine which agent should respond based on message content
-        const agentType = this.determineResponsibleAgent(text);
-        const agent = this.agents[agentType];
-        const character = CHARACTERS[side][agentType];
+      // Send typing indicator
+      this.bot.sendChatAction(chatId, "typing");
 
-        // Generate response using the agent
-        const response = await this.generateAgentResponse(
-          agentType,
-          character,
-          text
+      try {
+        console.log(
+          `📝 Message received from ${this.config.userId}: "${text}"`
         );
 
-        const formattedResponse = `${character.image} **${character.name}**:
+        const response = await this.handleUserMessage(text, chatId);
+
+        if (response) {
+          const formattedResponse = `${character.image} **${character.name}**:
 
 ${response}
 
 ---
-*${sideTitle} • ${
-          agentType.charAt(0).toUpperCase() + agentType.slice(1)
-        } Agent*`;
+*${sideTitle} • Powered by the Force*`;
 
-        this.bot.sendMessage(chatId, formattedResponse, {
-          parse_mode: "Markdown",
-        });
+          await this.bot.sendMessage(chatId, formattedResponse, {
+            parse_mode: "Markdown",
+          });
+        } else {
+          await this.bot.sendMessage(
+            chatId,
+            `${sideEmoji} *The Force is disturbed...*\n\nThere was an issue processing your request. Please try again.`
+          );
+        }
       } catch (error) {
         console.error(
           `Error handling message for ${this.config.userId}:`,
@@ -225,70 +193,126 @@ ${response}
     });
   }
 
-  private determineResponsibleAgent(message: string): keyof JediAgents {
-    const lowerMessage = message.toLowerCase();
+  private async handleUserMessage(
+    message: string,
+    chatId: number
+  ): Promise<string | null> {
+    const side = this.config.selectedSide;
+    const character = CHARACTERS[side].comms;
 
-    // Simple keyword-based routing
-    if (
-      lowerMessage.includes("message") ||
-      lowerMessage.includes("email") ||
-      lowerMessage.includes("communicate")
-    ) {
-      return "comms";
-    }
-    if (
-      lowerMessage.includes("community") ||
-      lowerMessage.includes("users") ||
-      lowerMessage.includes("social")
-    ) {
-      return "community";
-    }
-    if (
-      lowerMessage.includes("business") ||
-      lowerMessage.includes("compliance") ||
-      lowerMessage.includes("legal")
-    ) {
-      return "business";
-    }
-
-    // Default to core operations
-    return "core";
-  }
-
-  private async generateAgentResponse(
-    agent: Agent,
-    character: Character,
-    userMessage: string
-  ): Promise<string> {
     try {
-      // Use the agent's capability to generate a character response
-      const result = await agent.createTask("respondAsCharacter", {
-        userMessage,
-        context: `User is on the ${this.config.selectedSide} side with ${character.name}`,
+      // Create task for the Jedi comms project
+      const task = await this.createTask({
+        workspaceId: this.workspaceId,
+        assignee: this.agentId,
+        description: `Jedi ${side} side response to user message`,
+        body: `User (${this.config.botName}) said: "${message}"
+
+Please respond as ${character.name} from the ${side} side of the Force.
+
+Character context:
+- Name: ${character.name}
+- Title: ${character.title}
+- Personality: ${character.personality}
+- Side: ${side} side of the Force
+
+Respond in character while being helpful and wise. Keep the Star Wars theme but focus on actually helping the user.`,
+        input: message,
+        expectedOutput: `A helpful response from ${character.name} that stays in character`,
+        dependencies: [],
       });
 
-      return (
-        result ||
-        `I am ${character.name}. I have received your message and will assist you accordingly.`
+      console.log(
+        `🚀 Task created with ID: ${task.id} for user ${this.config.userId}`
       );
+
+      // Wait for task completion
+      const result = await this.waitForTaskCompletion(task.id, chatId);
+
+      return result;
     } catch (error) {
-      console.error("Error generating agent response:", error);
-      return `${character.greeting}\n\nI apologize, but I'm experiencing some difficulty right now. Please try again.`;
+      console.error("Error creating task:", error);
+      return null;
     }
   }
 
-  private async generateCharacterResponse(
-    character: Character,
-    userMessage: string,
-    context?: string
-  ): Promise<string> {
-    // This could be enhanced with more sophisticated AI response generation
-    const responses = [
-      `${character.greeting}\n\nRegarding "${userMessage}" - I will handle this with the wisdom of the ${this.config.selectedSide} side.`,
-      `As ${character.name}, I understand your request about "${userMessage}". Let me assist you accordingly.`,
-      `*${character.personality}*\n\nI've received your message: "${userMessage}". How may I serve you further?`,
-    ];
+  private async waitForTaskCompletion(
+    taskId: number,
+    chatId: number
+  ): Promise<string | null> {
+    const maxWaitTime = 120000; // 2 minutes
+    const pollInterval = 5000; // 5 seconds
+    const startTime = Date.now();
 
-    return responses[Math.floor(Math.random() * responses.length)];
+    while (Date.now() - startTime < maxWaitTime) {
+      try {
+        // Continue typing indicator
+        this.bot.sendChatAction(chatId, "typing");
+
+        // Check task status
+        const taskDetail = await this.getTaskDetail({
+          taskId: taskId,
+          workspaceId: this.workspaceId,
+        });
+
+        console.log(`⏳ Task ${taskId} status: ${taskDetail?.status}`);
+
+        if (taskDetail?.status === "done") {
+          console.log(`✅ Task completed!`);
+
+          // Check for output file
+          if (taskDetail.attachments && taskDetail.attachments.length > 0) {
+            try {
+              const files = await this.getFiles({
+                workspaceId: this.workspaceId,
+              });
+              const resultFile = files.find((file: any) =>
+                taskDetail.attachments?.some((att: any) =>
+                  file.path?.includes(att.path)
+                )
+              );
+
+              if (resultFile) {
+                const fileContent = await axios.get(resultFile.fullUrl);
+
+                // Clean up the file
+                await this.deleteFile({
+                  workspaceId: this.workspaceId,
+                  fileId: resultFile.id,
+                }).catch(() => {});
+
+                return (
+                  fileContent.data ||
+                  "Task completed but could not retrieve result."
+                );
+              }
+            } catch (fileError) {
+              console.error("Error reading result file:", fileError);
+            }
+          }
+
+          // If no file attachment, check task output
+          if (taskDetail.output) {
+            return taskDetail.output;
+          }
+
+          return "Task completed.";
+        }
+
+        if (taskDetail?.status === "error") {
+          console.error(`❌ Task failed`);
+          return null;
+        }
+
+        // Wait before next poll
+        await new Promise((resolve) => setTimeout(resolve, pollInterval));
+      } catch (pollError) {
+        console.error("Error during polling:", pollError);
+        // Continue polling despite errors
+      }
+    }
+
+    console.log(`⏰ Task ${taskId} timeout`);
+    return "Timeout. The task might still be processing.";
   }
 }

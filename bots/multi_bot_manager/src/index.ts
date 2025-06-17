@@ -27,16 +27,6 @@ app.post("/api/create-bot", async (req, res) => {
       botName,
       walletAddress,
       selectedSide,
-      openservConfig: {
-        apiKey: process.env.OPENSERV_API_KEY!,
-        workspaceId: parseInt(process.env.WORKSPACE_ID!),
-        agentIds: {
-          comms: parseInt(process.env.AGENT_ID_COMMS!),
-          community: parseInt(process.env.AGENT_ID_COMMUNITY!),
-          business: parseInt(process.env.AGENT_ID_BUSINESS!),
-          core: parseInt(process.env.AGENT_ID_CORE!),
-        },
-      },
     });
 
     res.json({ success: true, message: `Bot created for ${botName}` });

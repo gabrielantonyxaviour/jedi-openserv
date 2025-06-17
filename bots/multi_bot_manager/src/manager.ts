@@ -1,7 +1,5 @@
 import TelegramBot from "node-telegram-bot-api";
-import { Agent } from "@openserv-labs/sdk";
-import { JediBot } from "./bot";
-import { CHARACTERS } from "./character";
+import { JediBot } from "./bot.js";
 
 interface BotConfig {
   userId: string;
@@ -9,33 +7,16 @@ interface BotConfig {
   botName: string;
   walletAddress: string;
   selectedSide: "light" | "dark";
-  openservConfig: {
-    apiKey: string;
-    workspaceId: number;
-    agentIds: {
-      comms: number;
-      community: number;
-      business: number;
-      core: number;
-    };
-  };
 }
 
 interface ActiveBot {
   config: BotConfig;
   bot: TelegramBot;
   jediBot: JediBot;
-  agents: {
-    comms: Agent;
-    community: Agent;
-    business: Agent;
-    core: Agent;
-  };
 }
 
 export class BotManager {
   private activeBots: Map<string, ActiveBot> = new Map();
-  private basePort = 8000;
 
   constructor() {
     console.log("🌟 Jedi Bot Manager initialized");
@@ -56,18 +37,23 @@ export class BotManager {
       // Create Telegram bot instance
       const bot = new TelegramBot(botToken, { polling: true });
 
-      // Create OpenServ agents based on selected side
-      const agents = await this.createAgents(config, selectedSide);
-
-      // Create Jedi bot wrapper
-      const jediBot = new JediBot(config, bot, agents);
+      // Create Jedi bot with OpenServ integration
+      const jediBot = new JediBot(
+        {
+          ...config,
+          openservConfig: {
+            workspaceId: parseInt(process.env.JEDI_WORKSPACE_ID!), // 4440
+            agentId: parseInt(process.env.JEDI_AGENT_ID!), // The comms project agent ID
+          },
+        },
+        bot
+      );
 
       // Store active bot
       const activeBot: ActiveBot = {
         config,
         bot,
         jediBot,
-        agents,
       };
 
       this.activeBots.set(userId, activeBot);
@@ -76,69 +62,12 @@ export class BotManager {
       await jediBot.start();
 
       console.log(
-        `✅ Jedi bot created for user ${userId} with ${selectedSide} side characters`
+        `✅ Jedi bot created for user ${userId} with ${selectedSide} side`
       );
     } catch (error) {
       console.error(`❌ Failed to create bot for user ${userId}:`, error);
       throw error;
     }
-  }
-
-  private async createAgents(config: BotConfig, side: "light" | "dark") {
-    const { openservConfig } = config;
-    const sideCharacters = CHARACTERS[side];
-
-    const agents = {
-      comms: new Agent({
-        systemPrompt: this.createSystemPrompt(sideCharacters.comms, side),
-        apiKey: openservConfig.apiKey,
-        port: this.basePort++,
-      }),
-      community: new Agent({
-        systemPrompt: this.createSystemPrompt(sideCharacters.community, side),
-        apiKey: openservConfig.apiKey,
-        port: this.basePort++,
-      }),
-      business: new Agent({
-        systemPrompt: this.createSystemPrompt(sideCharacters.business, side),
-        apiKey: openservConfig.apiKey,
-        port: this.basePort++,
-      }),
-      core: new Agent({
-        systemPrompt: this.createSystemPrompt(sideCharacters.core, side),
-        apiKey: openservConfig.apiKey,
-        port: this.basePort++,
-      }),
-    };
-
-    // Start all agents
-    Object.values(agents).forEach((agent) => agent.start());
-
-    return agents;
-  }
-
-  private createSystemPrompt(character: any, side: "light" | "dark"): string {
-    const forceAlignment = side === "light" ? "Jedi Code" : "Sith Code";
-
-    return `You are ${character.name}, ${character.title}.
-
-CHARACTER: ${character.description}
-
-PERSONALITY: ${character.personality}
-
-GREETING: "${character.greeting}"
-
-FORCE ALIGNMENT: You follow the ${forceAlignment} and embody the ${side} side of the Force.
-
-ROLE: You are one of 4 AI agents serving this user in their Jedi AI system. Work collaboratively with other agents when needed.
-
-COMMUNICATION STYLE: 
-- Stay in character as ${character.name}
-- Use appropriate ${side} side terminology and philosophy
-- Be helpful while maintaining your unique personality
-- Reference Star Wars concepts naturally but don't overdo it
-
-CAPABILITIES: Handle requests related to your specialization while maintaining character immersion.`;
   }
 
   async removeBot(userId: string): Promise<void> {
@@ -152,11 +81,6 @@ CAPABILITIES: Handle requests related to your specialization while maintaining c
 
     // Stop Telegram polling
     await activeBot.bot.stopPolling();
-
-    // Stop OpenServ agents
-    Object.values(activeBot.agents).forEach((agent) => {
-      // Agent doesn't have a stop method, but we can at least clean up references
-    });
 
     // Remove from active bots
     this.activeBots.delete(userId);
@@ -175,7 +99,7 @@ CAPABILITIES: Handle requests related to your specialization while maintaining c
       status: "active",
       botName: activeBot.config.botName,
       side: activeBot.config.selectedSide,
-      agentCount: Object.keys(activeBot.agents).length,
+      workspaceId: 4440,
       created: true,
     };
   }
