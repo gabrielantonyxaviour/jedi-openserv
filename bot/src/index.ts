@@ -40,7 +40,7 @@ class JediTelegramBot {
   }
 
   private setupWebApp() {
-    this.app.use(express.static(path.join(__dirname, "webapp")));
+    this.app.use(express.static("./src/webapp"));
     this.app.use(express.json());
 
     this.app.get("/", (req, res) => {
