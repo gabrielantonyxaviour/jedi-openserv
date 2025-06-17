@@ -12,7 +12,7 @@ import {
   Milestone,
   MemberOf,
 } from "@show-karma/karma-gap-sdk";
-import { GapIndexerClient } from "@show-karma/karma-gap-sdk/core/class";
+import { GapIndexerClient } from "@show-karma/karma-gap-sdk/core/class/index.js";
 import { ethers } from "ethers";
 import { Address, Hex } from "viem";
 
