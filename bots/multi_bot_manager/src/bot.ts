@@ -3,6 +3,18 @@ import { Agent } from "@openserv-labs/sdk";
 import { CHARACTERS } from "./character.js";
 import axios from "axios";
 import dotenv from "dotenv";
+import {
+  GAP,
+  Project,
+  ProjectDetails,
+  Grant,
+  GrantDetails,
+  Milestone,
+  MemberOf,
+} from "@show-karma/karma-gap-sdk";
+import { GapIndexerClient } from "@show-karma/karma-gap-sdk/core/class";
+import { ethers } from "ethers";
+import { Address, Hex } from "viem";
 
 dotenv.config();
 
@@ -26,6 +38,11 @@ export class JediBot extends Agent {
   private nonce: number;
   private kind: "comms" | "socials" | "core";
   private about: string;
+
+  private gap: GAP;
+  private wallet: ethers.Wallet;
+  private provider: ethers.JsonRpcProvider;
+  private project: Project | null = null;
 
   constructor(config: BotConfig, bot: TelegramBot) {
     super({
@@ -65,6 +82,85 @@ export class JediBot extends Agent {
         : process.env.CORE_AGENT_ID!
     );
 
+    this.gap = new GAP({
+      globalSchemas: false,
+      network: process.env.KARMA_NETWORK as any,
+      apiClient: new GapIndexerClient("https://gapapi.karmahq.xyz"),
+    });
+
+    this.provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
+    this.wallet = new ethers.Wallet(
+      process.env.AGENT_PRIVATE_KEY!,
+      this.provider
+    );
+
+    if (this.kind == "core") {
+      const projectData = {
+        ownerAddress: this.wallet.address,
+        title: "Jedi Project",
+        description:
+          "Jedi is your AI co-founder built for developers—an intelligent partner that helps you brainstorm ideas, write code, debug, and ship faster. From MVP to scale, Jedi works beside you like a true teammate, turning your thoughts into product with clarity, speed, and precision.",
+        imageURL:
+          "https://pbs.twimg.com/profile_images/1931304627124744192/g6Zgm1BD_400x400.jpg",
+        links: [
+          {
+            type: "Twitter",
+            url: "https://x.com/JediOnChain",
+          },
+        ],
+        tags: [{ name: "AI" }, { name: "Developer" }, { name: "Productivity" }],
+        members: [this.wallet.address],
+      };
+
+      const project = new Project({
+        data: { project: true },
+        chainID: 42220,
+        schema: this.gap.findSchema("Project"),
+        recipient: projectData.ownerAddress as Address,
+      });
+
+      project.details = new ProjectDetails({
+        data: {
+          title: projectData.title,
+          description: projectData.description,
+          imageURL: projectData.imageURL || "",
+          links: projectData.links || [],
+          tags: projectData.tags || [],
+        },
+        schema: this.gap.findSchema("ProjectDetails"),
+        recipient: projectData.ownerAddress as Address,
+      });
+
+      // Add members if provided
+      if (projectData.members) {
+        for (const memberAddress of projectData.members) {
+          const member = new MemberOf({
+            data: { memberOf: true },
+            schema: this.gap.findSchema("MemberOf"),
+            refUID: project.uid,
+            recipient: memberAddress as Address,
+          });
+          project.members.push(member);
+        }
+      }
+
+      this.project = project;
+
+      project.attest(this.wallet).then(({ uids }) => {
+        console.log("this is the res");
+        const uid = uids[0];
+        console.log(uid);
+        this.bot.sendMessage(
+          this.ownerUserId,
+          `Master, I registered your project on https://gap.karma.xyz .
+  
+          Here is your uuid: ${uid}
+          
+          Let's acheive greatness by the Sith order`
+        );
+      });
+    }
+
     if (this.config.kind == "socials") {
       this.createTask({
         workspaceId: this.workspaceId,
@@ -72,9 +168,9 @@ export class JediBot extends Agent {
         description: `Jedi socials side response to user message`,
         body: `Generate a tweet to setup the project`,
         input: `Here is the basic description of the project:
-        
+
            ${this.about}.
-  
+
            Post your first tweet announcing that you, Darth Vader are going to handle the twitter for this project and also explain in short about the poject all in less than 250 characters.`,
         expectedOutput: `Post a tweet on Twitter that announces that you, Darth Vader are going to handle the twitter for this project and also explain in short about the poject all in less than 250 characters.`,
         dependencies: [],
@@ -107,9 +203,8 @@ export class JediBot extends Agent {
 
   private setupHandlers(): void {
     const side = this.config.selectedSide;
-    const sideEmoji = side === "light" ? "🔵" : "🔴";
     const sideTitle = side === "light" ? "Jedi Council" : "Sith Order";
-    const character = CHARACTERS[side][this.config.kind]; // Use the comms character
+    const character = CHARACTERS[side][this.kind]; // Use the comms character
 
     // Start command
     this.bot.onText(/\/start/, async (msg) => {
@@ -186,6 +281,8 @@ export class JediBot extends Agent {
         const response = await this.handleUserMessage(question, chatId);
 
         if (response) {
+          console.log("this is the response");
+          console.log(character);
           const formattedResponse = `${character.image} **${character.name}**:
 
 ${response}
@@ -213,6 +310,126 @@ ${response}
         );
       }
     });
+
+    if (this.kind == "core") {
+      this.bot.onText(/\/grant (.+)/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        const grantText = match?.[1];
+        const userId = msg.from?.id?.toString();
+        const isOwner = userId === this.ownerUserId;
+
+        // Only owner can create grants
+        if (!isOwner) {
+          await this.bot.sendMessage(chatId, "You dare command me? Pathetic.");
+          return;
+        }
+
+        if (!grantText) {
+          await this.bot.sendMessage(
+            chatId,
+            "❌ Please provide grant details: /grant [your grant description]"
+          );
+          return;
+        }
+
+        if (grantText.length > 300) {
+          await this.bot.sendMessage(
+            chatId,
+            "❌ Grant description too long. Please keep it under 250 characters."
+          );
+          return;
+        }
+
+        // Send typing indicator
+        this.bot.sendChatAction(chatId, "typing");
+
+        try {
+          console.log(
+            `💰 Grant command from ${this.config.userId}: "${grantText}"`
+          );
+
+          // TODO: Process grant here
+
+          const grantData = {
+            title: "Apply for OpenServAI Grants",
+            description: grantText,
+            proposalURL: "https://example.com/proposal",
+            communityUID: "",
+            cycle: "1",
+            season: "1",
+          };
+
+          await this.bot.sendMessage(
+            chatId,
+            "✅ Grant command received. Processing..."
+          );
+        } catch (error) {
+          console.error(
+            `Error processing grant for ${this.config.userId}:`,
+            error
+          );
+          await this.bot.sendMessage(
+            chatId,
+            "❌ An error occurred processing the grant."
+          );
+        }
+      });
+
+      // Milestone command (core only)
+      this.bot.onText(/\/milestone (.+)/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        const milestoneText = match?.[1];
+        const userId = msg.from?.id?.toString();
+        const isOwner = userId === this.ownerUserId;
+
+        // Only owner can create milestones
+        if (!isOwner) {
+          await this.bot.sendMessage(chatId, "You dare command me? Pathetic.");
+          return;
+        }
+
+        if (!milestoneText) {
+          await this.bot.sendMessage(
+            chatId,
+            "❌ Please provide milestone details: /milestone [your milestone description]"
+          );
+          return;
+        }
+
+        if (milestoneText.length > 300) {
+          await this.bot.sendMessage(
+            chatId,
+            "❌ Milestone description too long. Please keep it under 250 characters."
+          );
+          return;
+        }
+
+        // Send typing indicator
+        this.bot.sendChatAction(chatId, "typing");
+
+        try {
+          console.log(
+            `📋 Milestone command from ${this.config.userId}: "${milestoneText}"`
+          );
+
+          // TODO: Process milestone here
+
+          await this.bot.sendMessage(
+            chatId,
+            "✅ Milestone command received. Processing..."
+          );
+        } catch (error) {
+          console.error(
+            `Error processing milestone for ${this.config.userId}:`,
+            error
+          );
+          await this.bot.sendMessage(
+            chatId,
+            "❌ An error occurred processing the milestone."
+          );
+        }
+      });
+    }
 
     // Replace the general message handler
     this.bot.on("message", async (msg) => {
@@ -306,6 +523,8 @@ ${response}
   ): Promise<string | null> {
     const side = this.config.selectedSide;
     const character = CHARACTERS[side][this.config.kind];
+    console.log("this is the character");
+    console.log(character);
 
     try {
       console.log("this is being called");
@@ -329,7 +548,7 @@ ${response}
         IMPORTANT INSTRUCTION: DO NOT USE agents that are not mentioned in the instructions. Be concious with the agents you use. Not all agents need to be user for all tasks.
         `,
         input: message,
-        expectedOutput: `A helpful response from ${character.name} that stays in character`,
+        expectedOutput: `A helpful response from ${character.name} that stays in character.   IMPORTANT INSTRUCTION: DO NOT USE agents that are not mentioned in the instructions. Be concious with the agents you use. Not all agents need to be user for all tasks.`,
         dependencies: [],
       });
 
