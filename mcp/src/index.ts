@@ -4,7 +4,7 @@ dotenv.config();
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import express from "express";
 import cors from "cors";
-import { createServer } from "./server.js";
+import { createJediServer } from "./server.js";
 
 console.error("Starting Jedi Context SSE server...");
 
@@ -18,7 +18,7 @@ app.use(express.json());
 
 app.get("/sse", async (req, res) => {
   let transport: SSEServerTransport;
-  const { server, cleanup } = createServer();
+  const { server, cleanup } = createJediServer();
 
   if (req?.query?.sessionId) {
     const sessionId = req?.query?.sessionId as string;
@@ -50,7 +50,6 @@ app.post("/message", async (req, res) => {
     console.log(req.body);
     try {
       await transport.handlePostMessage(req, res);
-      console.log("Message handled successfully");
     } catch (error) {
       console.error("Error handling POST message:", error);
       if (!res.headersSent) {
