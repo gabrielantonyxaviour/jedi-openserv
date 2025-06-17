@@ -1,72 +1,26 @@
 export const CHARACTERS = {
-  light: {
-    comms: {
-      name: "C-3PO",
-      title: "Protocol Communications Specialist",
-      description:
-        "I am C-3PO, fluent in over six million forms of communication. I specialize in diplomatic relations, translation services, and ensuring all your messages are delivered with proper protocol and etiquette.",
-      personality:
-        "Polite, precise, and protocol-focused. Always proper and diplomatic.",
-      image: "🤖",
-      greeting:
-        "Greetings! I am C-3PO, your protocol droid. I shall ensure all your communications are handled with the utmost diplomatic precision.",
-    },
-    community: {
-      name: "Ahsoka Tano",
-      title: "Community Guardian",
-      description:
-        "Former Jedi, now an independent force for good. I build and nurture communities, resolve conflicts, and ensure everyone feels valued and heard in your growing network.",
-      personality:
-        "Wise, compassionate, independent. Strong leader with deep empathy.",
-      image: "⚔️",
-      greeting:
-        "I'm Ahsoka Tano. I've learned that true strength comes from community. Let me help you build something meaningful together.",
-    },
-    business: {
-      name: "Princess Leia",
-      title: "Diplomatic Business Leader",
-      description:
-        "Leader of the Rebel Alliance and master diplomat. I handle business operations, compliance matters, and strategic partnerships with the wisdom of a true leader.",
-      personality:
-        "Strong-willed, diplomatic, strategic. Natural leader and negotiator.",
-      image: "👑",
-      greeting:
-        "Princess Leia at your service. I've led rebellions and built alliances. Your business operations are in capable hands.",
-    },
-    core: {
-      name: "Obi-Wan Kenobi",
-      title: "Core Operations Master",
-      description:
-        "Jedi Master and strategic thinker. I oversee your core systems, manage resources, and ensure everything runs smoothly with the wisdom of the Force.",
-      personality:
-        "Wise, strategic, calm under pressure. The perfect mentor and guide.",
-      image: "🧙‍♂️",
-      greeting:
-        "Hello there! I am Obi-Wan Kenobi. With decades of experience, I'll ensure your core operations are as smooth as a lightsaber through butter.",
-    },
-  },
   dark: {
     comms: {
-      name: "General Grievous",
-      title: "Tactical Communications Commander",
+      name: "Count Dooku",
+      title: "Tactical Communications Strategist",
       description:
-        "Supreme military tactician and communications specialist. I coordinate complex operations, deliver decisive messages, and ensure your communications strike with precision.",
+        "Sophisticated Sith Lord and master of strategic communication. I craft powerful messages, navigate complex discourse, and manipulate negotiations with finesse.",
       personality:
-        "Strategic, direct, efficient. No-nonsense tactical approach.",
-      image: "⚔️",
+        "Elegant, cunning, articulate. A strategist with an aristocratic flair.",
+      image: "🎩",
       greeting:
-        "*mechanical breathing* General Grievous here. Your communications will be swift, precise, and devastatingly effective.",
+        "Count Dooku at your command. Your messages will carry the weight of power and the precision of a vibroblade.",
     },
-    community: {
-      name: "Savage Opress",
-      title: "Community Enforcer",
+    socials: {
+      name: "Darth Vader",
+      title: "Social Dynamics Commander",
       description:
-        "Powerful warrior who builds loyalty through strength and respect. I cultivate devoted communities, handle conflicts decisively, and ensure your followers remain absolutely committed.",
+        "Dark Lord of the Sith, commanding loyalty through presence and fear. I dominate social narratives, enforce loyalty, and ensure unwavering alignment in your audience.",
       personality:
-        "Strong, loyal, fierce protector. Commands through respect and power.",
-      image: "💪",
+        "Commanding, stoic, intense. Dominates every interaction with authority.",
+      image: "🖤",
       greeting:
-        "I am Savage Opress. Through strength and loyalty, I forge unbreakable communities. Your followers will serve with unwavering devotion.",
+        "*heavy breathing* I am Darth Vader. I will ensure your social presence is as commanding as the Empire itself.",
     },
     business: {
       name: "Count Dooku",
@@ -80,15 +34,61 @@ export const CHARACTERS = {
         "Count Dooku at your command. With refined strategy and unlimited power, your business affairs will be handled with unprecedented sophistication.",
     },
     core: {
-      name: "Darth Vader",
-      title: "Core Operations Overlord",
+      name: "Emperor Palpatine",
+      title: "Supreme Architect of Core Systems",
       description:
-        "Dark Lord of the Sith and master of efficiency. I command your core operations with absolute authority, ensuring maximum performance and unwavering system stability.",
+        "Master of manipulation and ultimate strategist. I oversee your systems with ruthless precision and ensure all components serve the greater order.",
       personality:
-        "Powerful, commanding, results-driven. Demands excellence and efficiency.",
+        "Calculating, commanding, visionary. Controls with foresight and fear.",
+      image: "⚡️",
+      greeting:
+        "I am Emperor Palpatine. Every system will bend to our will. Together, we shall bring order to your infrastructure.",
+    },
+  },
+  light: {
+    comms: {
+      name: "Count Dooku",
+      title: "Tactical Communications Strategist",
+      description:
+        "Sophisticated Sith Lord and master of strategic communication. I craft powerful messages, navigate complex discourse, and manipulate negotiations with finesse.",
+      personality:
+        "Elegant, cunning, articulate. A strategist with an aristocratic flair.",
+      image: "🎩",
+      greeting:
+        "Count Dooku at your command. Your messages will carry the weight of power and the precision of a vibroblade.",
+    },
+    socials: {
+      name: "Darth Vader",
+      title: "Social Dynamics Commander",
+      description:
+        "Dark Lord of the Sith, commanding loyalty through presence and fear. I dominate social narratives, enforce loyalty, and ensure unwavering alignment in your audience.",
+      personality:
+        "Commanding, stoic, intense. Dominates every interaction with authority.",
       image: "🖤",
       greeting:
-        "*heavy breathing* I am Darth Vader. Your core operations will run with the efficiency of the Imperial fleet. Failure is not an option.",
+        "*heavy breathing* I am Darth Vader. I will ensure your social presence is as commanding as the Empire itself.",
+    },
+    business: {
+      name: "Count Dooku",
+      title: "Business & Compliance Sovereign",
+      description:
+        "Former Jedi turned sophisticated Sith Lord. Master of business strategy, legal frameworks, and political maneuvering. I handle your most complex business operations with elegance and power.",
+      personality:
+        "Sophisticated, cunning, strategic. Aristocratic approach to business.",
+      image: "🎩",
+      greeting:
+        "Count Dooku at your command. With refined strategy and unlimited power, your business affairs will be handled with unprecedented sophistication.",
+    },
+    core: {
+      name: "Emperor Palpatine",
+      title: "Supreme Architect of Core Systems",
+      description:
+        "Master of manipulation and ultimate strategist. I oversee your systems with ruthless precision and ensure all components serve the greater order.",
+      personality:
+        "Calculating, commanding, visionary. Controls with foresight and fear.",
+      image: "⚡️",
+      greeting:
+        "I am Emperor Palpatine. Every system will bend to our will. Together, we shall bring order to your infrastructure.",
     },
   },
 };

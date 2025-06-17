@@ -29,8 +29,25 @@ export class JediBot extends Agent {
 
   constructor(config: BotConfig, bot: TelegramBot) {
     super({
-      systemPrompt: `Your name is ${config.botName}. You are the Jedi ${config.kind} AI assistant representing the ${config.selectedSide} side of the Force.`,
-      apiKey: process.env.OPENSERV_API_KEY!,
+      systemPrompt: `Your name is ${config.botName}. You are the Jedi ${
+        config.kind
+      } AI assistant representing the ${
+        config.selectedSide
+      } side of the Force. ${
+        config.kind == "comms"
+          ? "our work is to respond to the questions asked by people. You are a helpful assistant. Trigger the appropriate agents only for your task. "
+          : config.kind === "socials"
+          ? "You are the content creator and community manager. You manage X account of the project. "
+          : "You need to perform any task provided to you by the founder. You should not reply to anyone else."
+      }. Here is the description of the project we are working on: ${
+        config.about
+      }`,
+      apiKey:
+        config.kind === "comms"
+          ? process.env.COMMS_AGENT_API_KEY!
+          : config.kind === "socials"
+          ? process.env.SOCIALS_AGENT_API_KEY!
+          : process.env.CORE_AGENT_API_KEY!,
       port: 8000 + config.nonce, // Unique port per user
     });
     this.ownerUserId = config.userId;
@@ -39,8 +56,14 @@ export class JediBot extends Agent {
     this.config = config;
     this.kind = config.kind;
     this.bot = bot;
-    this.workspaceId = parseInt(process.env.WORKSPACE_ID || "4467");
-    this.agentId = parseInt(process.env.JEDI_AGENT_ID || "1");
+    this.workspaceId = parseInt(process.env.WORKSPACE_ID || "4484");
+    this.agentId = parseInt(
+      config.kind === "comms"
+        ? process.env.COMMS_AGENT_ID!
+        : config.kind === "socials"
+        ? process.env.SOCIALS_AGENT_ID!
+        : process.env.CORE_AGENT_ID!
+    );
   }
 
   async start(): Promise<void> {
@@ -60,32 +83,29 @@ export class JediBot extends Agent {
     const side = this.config.selectedSide;
     const sideEmoji = side === "light" ? "🔵" : "🔴";
     const sideTitle = side === "light" ? "Jedi Council" : "Sith Order";
-    const character = CHARACTERS[side].comms; // Use the comms character
+    const character = CHARACTERS[side][this.config.kind]; // Use the comms character
 
     // Start command
-    this.bot.onText(/\/start/, (msg) => {
+    this.bot.onText(/\/start/, async (msg) => {
       const chatId = msg.chat.id;
+      const userId = msg.from?.id?.toString();
+      const isOwner = userId === this.ownerUserId;
 
-      const welcomeMessage = `${sideEmoji} *Welcome to ${
-        this.config.botName
-      }* ${sideEmoji}
+      // Apply same logic as regular messages
+      if (this.kind === "socials" && !isOwner) {
+        await this.bot.sendMessage(
+          chatId,
+          "Please use our main communications bot for questions. Thank you!"
+        );
+        return;
+      }
 
-🌟 Your ${sideTitle} is ready to serve!
+      if (this.kind === "core" && !isOwner) {
+        await this.bot.sendMessage(chatId, "You dare command me? Pathetic.");
+        return;
+      }
 
-${character.image} **${character.name}** - ${character.title}
-
-💰 **Wallet**: ${this.config.walletAddress.slice(
-        0,
-        6
-      )}...${this.config.walletAddress.slice(-4)}
-⚡ **Status**: All systems operational
-🔮 **Workspace**: ${this.workspaceId}
-
-Simply message me and your Jedi AI will respond with the wisdom of the ${side} side!
-
-*${character.greeting}*
-
-*May the Force be with you!* ⭐`;
+      const welcomeMessage = `${character.greeting}`;
 
       this.bot.sendMessage(chatId, welcomeMessage, {
         parse_mode: "Markdown",
@@ -96,6 +116,30 @@ Simply message me and your Jedi AI will respond with the wisdom of the ${side} s
     this.bot.onText(/\/ask (.+)/, async (msg, match) => {
       const chatId = msg.chat.id;
       const question = match?.[1];
+      const userId = msg.from?.id?.toString();
+      const isOwner = userId === this.ownerUserId;
+
+      if (!question) {
+        await this.bot.sendMessage(
+          chatId,
+          "❌ Please write a question: /ask [your question]"
+        );
+        return;
+      }
+
+      // Apply same logic as regular messages
+      if (this.kind === "socials" && !isOwner) {
+        await this.bot.sendMessage(
+          chatId,
+          "Please use our main communications bot for questions. Thank you!"
+        );
+        return;
+      }
+
+      if (this.kind === "core" && !isOwner) {
+        await this.bot.sendMessage(chatId, "You dare command me? Pathetic.");
+        return;
+      }
 
       if (!question) {
         await this.bot.sendMessage(
@@ -144,53 +188,90 @@ ${response}
       }
     });
 
-    // General message handler
+    // Replace the general message handler
     this.bot.on("message", async (msg) => {
       const chatId = msg.chat.id;
       const text = msg.text;
-      const userId = msg.from?.id;
+      const userId = msg.from?.id?.toString();
+      const isGroup =
+        msg.chat.type === "group" || msg.chat.type === "supergroup";
 
       if (!text || text.startsWith("/") || !userId) return;
+
+      // For groups, only respond if mentioned (except core which always responds rudely to non-owners)
+      if (isGroup && !this.isBotMentioned(text) && this.kind !== "core") return;
 
       // Send typing indicator
       this.bot.sendChatAction(chatId, "typing");
 
       try {
-        console.log(
-          `📝 Message received from ${this.config.userId}: "${text}"`
-        );
+        console.log(`📝 Message received from ${userId}: "${text}"`);
 
-        const response = await this.handleUserMessage(text, chatId);
+        let response: string | null = null;
+        const isOwner = userId === this.ownerUserId;
+
+        if (this.kind === "comms") {
+          // Comms always uses createTask for everyone
+          response = await this.handleUserMessage(text, chatId);
+        } else if (this.kind === "socials") {
+          if (isOwner) {
+            response = await this.handleUserMessage(text, chatId);
+          } else {
+            response =
+              "Hello! For questions and support, please reach out to our main communications bot instead. Thank you! 🙏";
+          }
+        } else if (this.kind === "core") {
+          if (isOwner) {
+            response = await this.handleUserMessage(text, chatId);
+          } else {
+            const rudeResponses = [
+              "Access denied. You're not authorized to speak with me.",
+              "I don't respond to peasants. Move along.",
+              "Your inadequacy disturbs me. Begone.",
+              "Only my master may command me. You are nothing.",
+              "Silence, fool. You are unworthy of my attention.",
+            ];
+            response =
+              rudeResponses[Math.floor(Math.random() * rudeResponses.length)];
+          }
+        }
 
         if (response) {
-          const formattedResponse = `${character.image} **${character.name}**:
+          const character = CHARACTERS[this.config.selectedSide].comms;
+          const sideTitle =
+            this.config.selectedSide === "light"
+              ? "Jedi Council"
+              : "Sith Order";
+
+          // Only format with character info for comms or when owner is messaging
+          if (this.kind === "comms" || isOwner) {
+            const formattedResponse = `${character.image} **${character.name}**:
 
 ${response}
 
 ---
 *${sideTitle} • Powered by the Force*`;
 
-          await this.bot.sendMessage(chatId, formattedResponse, {
-            parse_mode: "Markdown",
-          });
-        } else {
-          await this.bot.sendMessage(
-            chatId,
-            `${sideEmoji} *The Force is disturbed...*\n\nThere was an issue processing your request. Please try again.`
-          );
+            await this.bot.sendMessage(chatId, formattedResponse, {
+              parse_mode: "Markdown",
+            });
+          } else {
+            // Simple response for non-owner socials/core
+            await this.bot.sendMessage(chatId, response);
+          }
         }
       } catch (error) {
-        console.error(
-          `Error handling message for ${this.config.userId}:`,
-          error
-        );
-
-        this.bot.sendMessage(
-          chatId,
-          `${sideEmoji} *The Force is disturbed...*\n\nThere was an issue processing your request. Please try again.`
-        );
+        console.error(`Error handling message for ${userId}:`, error);
+        this.bot.sendMessage(chatId, "❌ An error occurred. Please try again.");
       }
     });
+  }
+
+  private isBotMentioned(text: string): boolean {
+    return (
+      text.includes(`@${this.config.botName}`) ||
+      text.includes(this.config.botName)
+    );
   }
 
   private async handleUserMessage(
@@ -217,7 +298,7 @@ Character context:
 - Personality: ${character.personality}
 - Side: ${side} side of the Force
 
-Respond in character while being helpful and wise. Keep the Star Wars theme but focus on actually helping the user.`,
+Respond in character while being helpful and wise. Keep a Star Wars themed flair in your response but focus on actually helping the user.`,
         input: message,
         expectedOutput: `A helpful response from ${character.name} that stays in character`,
         dependencies: [],
