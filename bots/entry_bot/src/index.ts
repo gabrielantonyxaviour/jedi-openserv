@@ -41,19 +41,19 @@ class JediBot {
     this.setupHandlers();
     console.log("🌟 Jedi Bot activated...");
 
-    axios.post("http://localhost:4000/api/create-bot", {
-      userId: 2041446422,
-      commsBotToken: "7712251056:AAGmPb5ySEhw6x63UZyZIyPkMmHAt3thFNs",
-      socialsBotToken: "7590163125:AAFBxacDGbQ1b9FYeqD-NK813PMRK_SwZY0",
-      coreBotToken: "7966730123:AAHCJO_eJwabWySuBjAT0TWgk1JD4fYxbvw",
-      commsBotName: "lknk",
-      socialsBotName: "bjjkbn",
-      coreBotName: "jlnolkn",
-      walletAddress: "0x0000000000000000000000000000000000000000",
-      selectedSide: "dark",
-      about:
-        "Jedi is your AI co-founder built for developers—an intelligent partner that helps you brainstorm ideas, write code, debug, and ship faster. From MVP to scale, Jedi works beside you like a true teammate, turning your thoughts into product with clarity, speed, and precision.",
-    });
+    // axios.post("http://localhost:4000/api/create-bot", {
+    //   userId: 2041446422,
+    //   commsBotToken: "7712251056:AAGmPb5ySEhw6x63UZyZIyPkMmHAt3thFNs",
+    //   socialsBotToken: "7590163125:AAFBxacDGbQ1b9FYeqD-NK813PMRK_SwZY0",
+    //   coreBotToken: "7966730123:AAHCJO_eJwabWySuBjAT0TWgk1JD4fYxbvw",
+    //   commsBotName: "lknk",
+    //   socialsBotName: "bjjkbn",
+    //   coreBotName: "jlnolkn",
+    //   walletAddress: "0x0000000000000000000000000000000000000000",
+    //   selectedSide: "dark",
+    //   about:
+    //     "Jedi is your AI co-founder built for developers—an intelligent partner that helps you brainstorm ideas, write code, debug, and ship faster. From MVP to scale, Jedi works beside you like a true teammate, turning your thoughts into product with clarity, speed, and precision.",
+    // });
   }
 
   private setupHandlers() {
