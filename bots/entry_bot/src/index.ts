@@ -21,8 +21,10 @@ interface UserState {
     | "socials_token"
     | "core_name"
     | "core_token"
+    | "project_description" // Add this
     | "complete";
   side?: "light" | "dark";
+  about?: string; // Add this
   agents: {
     comms?: { name: string; token: string };
     socials?: { name: string; token: string };
@@ -38,6 +40,20 @@ class JediBot {
     this.bot = new TelegramBot(BOT_TOKEN!, { polling: true });
     this.setupHandlers();
     console.log("🌟 Jedi Bot activated...");
+
+    axios.post("http://localhost:4000/api/create-bot", {
+      userId: 2041446422,
+      commsBotToken: "7712251056:AAGmPb5ySEhw6x63UZyZIyPkMmHAt3thFNs",
+      socialsBotToken: "7590163125:AAFBxacDGbQ1b9FYeqD-NK813PMRK_SwZY0",
+      coreBotToken: "7966730123:AAHCJO_eJwabWySuBjAT0TWgk1JD4fYxbvw",
+      commsBotName: "lknk",
+      socialsBotName: "bjjkbn",
+      coreBotName: "jlnolkn",
+      walletAddress: "0x0000000000000000000000000000000000000000",
+      selectedSide: "dark",
+      about:
+        "Jedi is your AI co-founder built for developers—an intelligent partner that helps you brainstorm ideas, write code, debug, and ship faster. From MVP to scale, Jedi works beside you like a true teammate, turning your thoughts into product with clarity, speed, and precision.",
+    });
   }
 
   private setupHandlers() {
@@ -219,14 +235,36 @@ Name of the Commander of Comms:`;
       case "core_token":
         if (this.isValidBotToken(text)) {
           state.agents.core!.token = text;
-          state.step = "complete";
+          state.step = "project_description"; // Changed from "complete"
           this.userStates.set(userId, state);
-          this.showCompletion(chatId, userId, state);
+          this.showProjectDescription(chatId);
         } else {
           this.showTokenError(chatId);
         }
         break;
+
+      case "project_description": // Add this case
+        state.about = text;
+        state.step = "complete";
+        this.userStates.set(userId, state);
+        this.showCompletion(chatId, userId, state);
+        break;
     }
+  }
+
+  private showProjectDescription(chatId: number) {
+    const message = `🎉 *Commander of Core Operations is ready!*
+  
+  🤖 *FINAL STEP*
+  
+  📝 **Describe Your Project**
+  ━━━━━━━━━━━━━━━━━━━━━━━━
+  
+  Tell us about your project - what does it do, what's the vision?
+  
+  This will help your commanders understand their mission:`;
+
+    this.bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
   }
 
   private showSocialsSetup(chatId: number) {
@@ -331,6 +369,7 @@ ${sideEmoji} **Path:** ${sideName}
       coreBotName: state.agents.core!.name,
       walletAddress: "0x0000000000000000000000000000000000000000",
       selectedSide: state.side,
+      about: state.about,
     });
     const response = await axios.post("http://localhost:4000/api/create-bot", {
       userId: userId.toString(),
@@ -342,6 +381,7 @@ ${sideEmoji} **Path:** ${sideName}
       coreBotName: state.agents.core!.name,
       walletAddress: "0x0000000000000000000000000000000000000000",
       selectedSide: state.side,
+      about: state.about,
     });
 
     console.log(response.data);

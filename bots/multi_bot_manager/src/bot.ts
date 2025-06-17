@@ -68,15 +68,26 @@ export class JediBot extends Agent {
     if (this.config.kind == "socials") {
       this.createTask({
         workspaceId: this.workspaceId,
-        assignee: parseInt(process.env.GENERAL_AGENT_ID || "3"),
+        assignee: 3,
         description: `Jedi socials side response to user message`,
         body: `Generate a tweet to setup the project`,
         input: `Here is the basic description of the project:
-         ${this.about}. 
-         
-         Create a first tweet announcing that you, Darth Vader are going to handle the twitter for this project and also explain in short about the poject all in less than 250 characters.`,
-        expectedOutput: `A tweet that announces that you, Darth Vader are going to handle the twitter for this project and also explain in short about the poject all in less than 250 characters.`,
+        
+           ${this.about}.
+  
+           Post your first tweet announcing that you, Darth Vader are going to handle the twitter for this project and also explain in short about the poject all in less than 250 characters.`,
+        expectedOutput: `Post a tweet on Twitter that announces that you, Darth Vader are going to handle the twitter for this project and also explain in short about the poject all in less than 250 characters.`,
         dependencies: [],
+      }).then((res) => {
+        console.log(
+          `🚀 Task created with ID: ${res.id} for user ${this.config.userId}`
+        );
+
+        // Wait for task completion
+        this.waitForTaskCompletion(res.id, 0).then((result) => {
+          console.log("this is the result");
+          console.log(result);
+        });
       });
     }
   }
@@ -294,14 +305,14 @@ ${response}
     chatId: number
   ): Promise<string | null> {
     const side = this.config.selectedSide;
-    const character = CHARACTERS[side].comms;
+    const character = CHARACTERS[side][this.config.kind];
 
     try {
       console.log("this is being called");
       // Create task for the Jedi comms project
       const task = await this.createTask({
         workspaceId: this.workspaceId,
-        assignee: this.agentId,
+        assignee: 1,
         description: `Jedi ${side} side response to user message`,
         body: `${
           this.kind == "comms" ? "Someone asked:" : "The founder asked:"
@@ -347,7 +358,7 @@ ${response}
     while (Date.now() - startTime < maxWaitTime) {
       try {
         // Continue typing indicator
-        this.bot.sendChatAction(chatId, "typing");
+        if (chatId != 0) this.bot.sendChatAction(chatId, "typing");
 
         // Check task status
         const taskDetail = await this.getTaskDetail({
