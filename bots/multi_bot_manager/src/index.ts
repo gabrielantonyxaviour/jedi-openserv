@@ -22,6 +22,7 @@ app.post("/api/create-bot", async (req, res) => {
       coreBotName,
       walletAddress,
       selectedSide,
+      about,
     } = req.body;
 
     // const body = {
@@ -38,6 +39,7 @@ app.post("/api/create-bot", async (req, res) => {
 
     await botManager.createBot({
       userId: userId.toString(),
+      about,
       commsBotToken,
       socialsBotToken,
       coreBotToken,

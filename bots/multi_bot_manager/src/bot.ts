@@ -9,18 +9,11 @@ dotenv.config();
 interface BotConfig {
   nonce: number;
   userId: string;
+  about: string;
   botName: string;
   kind: "comms" | "socials" | "core";
   walletAddress: string;
   selectedSide: "light" | "dark";
-}
-
-interface Character {
-  name: string;
-  title: string;
-  image: string;
-  greeting: string;
-  personality: string;
 }
 
 export class JediBot extends Agent {
@@ -32,6 +25,8 @@ export class JediBot extends Agent {
   private ownerUserId: string;
   private nonce: number;
   private kind: "comms" | "socials" | "core";
+  private about: string;
+
   constructor(config: BotConfig, bot: TelegramBot) {
     super({
       systemPrompt: `Your name is ${config.botName}. You are the Jedi ${config.kind} AI assistant representing the ${config.selectedSide} side of the Force.`,
@@ -39,6 +34,7 @@ export class JediBot extends Agent {
       port: 8000 + config.nonce, // Unique port per user
     });
     this.ownerUserId = config.userId;
+    this.about = config.about;
     this.nonce = config.nonce;
     this.config = config;
     this.kind = config.kind;

@@ -3,6 +3,7 @@ import { JediBot } from "./bot.js";
 
 interface BotConfig {
   userId: string;
+  about: string;
   commsBotToken: string;
   socialsBotToken: string;
   coreBotToken: string;
@@ -15,6 +16,7 @@ interface BotConfig {
 
 interface ActiveBot {
   config: BotConfig;
+  about: string;
   commsBot: TelegramBot;
   jediCommsBot: JediBot;
   socialsBot: TelegramBot;
@@ -34,6 +36,7 @@ export class BotManager {
   async createBot(config: BotConfig): Promise<void> {
     const {
       userId,
+      about,
       commsBotName,
       socialsBotName,
       coreBotName,
@@ -68,6 +71,7 @@ export class BotManager {
         {
           nonce: this.nonce,
           userId: userId,
+          about,
           botName: commsBotName,
           kind: "comms",
           walletAddress,
@@ -78,6 +82,7 @@ export class BotManager {
       const jediSocialsBot = new JediBot(
         {
           nonce: this.nonce + 1,
+          about,
           userId: userId,
           botName: socialsBotName,
           kind: "socials",
@@ -89,6 +94,7 @@ export class BotManager {
       const jediCoreBot = new JediBot(
         {
           nonce: this.nonce + 2,
+          about,
           userId: userId,
           botName: coreBotName,
           kind: "core",
@@ -101,6 +107,7 @@ export class BotManager {
       // Store active bot
       const activeBot: ActiveBot = {
         config,
+        about,
         commsBot: commsTelegramBot,
         jediCommsBot,
         socialsBot: socialsTelegramBot,
